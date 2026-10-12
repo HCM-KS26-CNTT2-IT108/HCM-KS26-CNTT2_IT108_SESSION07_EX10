@@ -1,0 +1,37 @@
+PHẦN 1: Phân tích & Đề xuất đa giải pháp
+
+1. Xác định Input và Output:
+- Input: Thư mục chứa log `/var/logs/` (và các thư mục con app/, database/, payment/), từ khóa tìm kiếm: "TIMEOUT".
+- Output: Danh sách các dòng chứa lỗi "TIMEOUT", hiển thị kèm theo tên file và số dòng để dễ truy vết.
+
+2. Đề xuất 3 giải pháp:
+- Giải pháp 1: Dùng lệnh `findstr /s /n "TIMEOUT" C:\var\logs\*.log` trong CMD.
+- Giải pháp 2: Dùng lệnh PowerShell thuần `Get-ChildItem -Path "C:\var\logs" -Recurse -Filter *.log | Select-String "TIMEOUT"` kết hợp xử lý file bị khóa.
+- Giải pháp 3: Dùng Linux Tool (`grep -rnw '/var/logs/' -e 'TIMEOUT'`) nếu chạy trên môi trường Linux/WSL.
+
+
+PHẦN 2: So sánh & Lựa chọn
+
+| Tiêu chí | Giải pháp 1 (findstr CMD) | Giải pháp 2 (PowerShell) | Giải pháp 3 (grep Linux) |
+| :--- | :--- | :--- | :--- |
+| Tốc độ xử lý | Rất nhanh (Cơ chế native C++) | Khá nhanh (.NET Engine) | Cực kỳ tối ưu và nhanh |
+| Xử lý file bị khóa | Kém (Bị lỗi văng ngoại lệ nếu file lock) | Tốt (Có thể dùng Try/Catch bỏ qua file khóa) | Tốt (Tùy cấu hình bỏ qua file) |
+| Cross-platform | Chỉ chạy trên Windows | Tối ưu trên Windows (Core chạy đa nền tảng) | Chạy trên Linux/macOS |
+| Độ phức tạp code | Đơn giản, ngắn gọn | Trung bình, dễ mở rộng logic | Ngắn gọn, cú pháp quen thuộc |
+| Hiển thị số dòng | Có hỗ trợ sẵn (`/n`) | Có hỗ trợ sẵn qua đối tượng MatchInfo | Có hỗ trợ sẵn (`-n`) |
+
+
+PHẦN 3: Triển khai
+
+- Lựa chọn giải pháp: Chọn **Giải pháp 2 (PowerShell)** vì hệ thống yêu cầu chạy trên Windows Server, đồng thời PowerShell có khả năng xử lý ngoại lệ (Try/Catch) để vượt qua bẫy file bị khóa bởi tiến trình khác mà không làm sập toàn bộ script.
+
+- Câu lệnh PowerShell hoàn chỉnh (vượt qua file bị khóa và in ra tên file, số dòng):
+
+```powershell
+Get-ChildItem -Path "C:\var\logs" -Recurse -Filter *.log | ForEach-Object {
+    try {
+        Get-Content $_.FullName -ErrorAction Stop | Select-String "TIMEOUT"
+    } catch {
+        Write-Warning "Bo qua file dang bi khoa: $($_.FullName)"
+    }
+}
